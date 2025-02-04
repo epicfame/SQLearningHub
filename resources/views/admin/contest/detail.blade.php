@@ -144,7 +144,7 @@
 
         <!-- Report Table -->
         <div class="table-container" style="width: 80%">
-            <h3>Report Contest</h3>
+            <h3>Report Summary Contest</h3>
             <table id="report-table" class="table">
                 <thead>
                     <tr>
@@ -152,6 +152,7 @@
                         <th>Name</th>
                         <th>Email</th>
                         <th>Score</th>
+                        <th>Final Score</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -164,6 +165,7 @@
                             <td>{{ $report['name'] }}</td>
                             <td>{{ $report['email'] }}</td>
                             <td>{{ $report['score'] }}</td>
+                            <td>{{ $report['score']/$report['max_score'] * 100 }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -172,7 +174,8 @@
 
         <!-- Report Question Table -->
         <div class="table-container" style="width: 80%">
-            <h3>Report Question Contest</h3>
+            <h3>Report Detail Contest</h3>
+            <p>HARD : 3, MEDIUM : 2, EASY : 1</p>
             <table id="report-question-table" class="table">
                 <thead>
                     <tr>
@@ -249,6 +252,10 @@
         // Go back to contest index page
         function goBackContestIndex() {
             window.location.href = "/admin/contest/index";
+        }
+
+        function downloadReportContest(){
+            window.open("/admin/contest/download/" + "{{ $contest->id }}", '_blank');
         }
     </script>
 @endsection

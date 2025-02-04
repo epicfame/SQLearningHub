@@ -13,6 +13,8 @@ use DB;
 use Auth;
 use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
+use Excel;
+use App\Exports\ReportCoreExport;
 
 class AdminController extends Controller
 {
@@ -313,6 +315,20 @@ class AdminController extends Controller
         $contestants = User::whereIn('id', $contestantId)->where('role', 'Guest')->get();
 
         $temp = [];
+
+        $maxScore = 0;
+        foreach($questions as $question) {
+            if($question->difficulty_level == 'HARD'){
+                $maxScore += 3;
+            }
+            else if($question->difficulty_level == 'MEDIUM'){
+                $maxScore += 2;
+            }
+            else if($question->difficulty_level == 'EASY'){
+                $maxScore += 1;
+            }
+        }
+
         foreach($contestants as $contestant){
             foreach($questions as $question){
                 $userAnswer = UserAnswer::where('user_id', $contestant->id)
@@ -355,6 +371,7 @@ class AdminController extends Controller
                     'correct' => $correct,
                     'score' => $userAnswer ? $score : 0,
                     'difficulty_level' => $question->difficulty_level,
+                    'max_score' => $maxScore,
                 ];
             }
         }
@@ -421,6 +438,7 @@ class AdminController extends Controller
                 'email' => $contestant->email,
                 'score' => 0,
                 'difficulty_level' => '',
+                'max_score' => $maxScore,
             ];
             foreach($questions as $question){
                 $userAnswer = UserAnswer::where('user_id', $contestant->id)
@@ -468,5 +486,182 @@ class AdminController extends Controller
             'reportQuestions' => $temp
         ]);
     }
+
+    public function downloadExcel($id){
+        $user = Auth::user();
+        $contest = Competition::find($id);
+        $questionId = explode(',', $contest->question_id);
+        $contestantId = explode(',', $contest->contestant_id);
+        $questions = Question::whereIn('id', $questionId)->get();
+        $contestants = User::whereIn('id', $contestantId)->where('role', 'Guest')->get();
+
+        $temp = [];
+        $maxScore = 0;
+        foreach($questions as $question) {
+            if($question->difficulty_level == 'HARD'){
+                $maxScore += 3;
+            }
+            else if($question->difficulty_level == 'MEDIUM'){
+                $maxScore += 2;
+            }
+            else if($question->difficulty_level == 'EASY'){
+                $maxScore += 1;
+            }
+        }
+        
+        foreach($contestants as $contestant){
+            foreach($questions as $question){
+                $userAnswer = UserAnswer::where('user_id', $contestant->id)
+                                        ->where('question_id', $question->id)
+                                        ->where('competition_batch_id', $id)
+                                        ->where('is_true', 1)
+                                        ->first();
+                $isSubmitted = UserAnswer::where('user_id', $contestant->id)
+                                        ->where('question_id', $question->id)
+                                        ->where('competition_batch_id', $id)
+                                        ->first();
+                $score = 0;
+                if($question->difficulty_level == 'HARD'){
+                    $score = 3;
+                }
+                else if($question->difficulty_level == 'MEDIUM'){
+                    $score = 2;
+                }
+                else if($question->difficulty_level == 'EASY'){
+                    $score = 1;
+                }
+
+                $correct = '';
+                if($isSubmitted){
+                    if($userAnswer){
+                        $correct = 'Correct';
+                    }
+                    else{
+                        $correct = 'Not Correct';
+                    }
+                }
+                else{
+                    $correct = 'Not Submitted';
+                }
+
+                $temp[] = [
+                    'name' => $contestant->name,
+                    'email' => $contestant->email,
+                    'title' => $question->title,
+                    'correct' => $correct,
+                    'score' => $userAnswer ? $score : 0,
+                    'difficulty_level' => $question->difficulty_level,
+                    'max_score' => $maxScore,
+                ];
+            }
+        }
+        // $report = User::whereIn('id', $contestantId)
+        //                     ->leftJoin('user_answers', function($join){
+        //                         $join->on('user_answers.user_id', 'user.id');
+        //                     })
+        //                     ->where()
+        //                     ->where('role', 'Guest')
+        //                     ->get();
+        $sqlReportQuery = "
+        SELECT
+            users.name,
+            users.email,
+            SUM(CASE 
+                    WHEN user_answers.is_true = 1 THEN
+                        CASE 
+                            WHEN questions.difficulty_level = 'HARD' THEN 3
+                            WHEN questions.difficulty_level = 'MEDIUM' THEN 2
+                            WHEN questions.difficulty_level = 'EASY' THEN 1
+                            ELSE 0
+                        END
+                ELSE 0 END) as `score`
+        FROM
+            users
+        LEFT JOIN user_answers ON user_answers.user_id = users.id AND user_answers.competition_batch_id = $id
+        LEFT JOIN questions ON questions.id = user_answers.question_id
+        WHERE
+            users.id IN (" . implode(',', $contestantId) . ")
+        GROUP BY
+            users.name,
+            users.email
+        ";
+
+        $reportQuestionQuery = "
+       SELECT
+            users.name,
+            users.email,
+            questions.title,
+            CASE
+                WHEN user_answers.is_true = 1 THEN 'Correct'
+                ELSE 'Not correct'
+            END AS `correct`,
+            questions.difficulty_level AS 'difficulty_level'
+        FROM
+            users
+        CROSS JOIN questions
+        LEFT JOIN user_answers ON user_answers.user_id = users.id
+                            AND user_answers.question_id = questions.id
+                            AND user_answers.competition_batch_id = $id
+        WHERE
+            users.id IN (" . implode(',', $contestantId) . ")
+        ORDER BY
+            users.name,
+            users.email,
+            questions.title
+        ";
+
+        $reportTemp = [];
+
+        foreach($contestants as $contestant){
+            $data = [
+                'name' => $contestant->name,
+                'email' => $contestant->email,
+                'score' => 0,
+                'difficulty_level' => '',
+                'max_score' => $maxScore,
+            ];
+            foreach($questions as $question){
+                $userAnswer = UserAnswer::where('user_id', $contestant->id)
+                                        ->where('question_id', $question->id)
+                                        ->where('competition_batch_id', $id)
+                                        ->where('is_true', 1)
+                                        ->first();
+                $isSubmitted = UserAnswer::where('user_id', $contestant->id)
+                                        ->where('question_id', $question->id)
+                                        ->where('competition_batch_id', $id)
+                                        ->first();
+                $score = 0;
+                if($question->difficulty_level == 'HARD'){
+                    $score = 3;
+                }
+                else if($question->difficulty_level == 'MEDIUM'){
+                    $score = 2;
+                }
+                else if($question->difficulty_level == 'EASY'){
+                    $score = 1;
+                }
+
+                $correct = '';
+                if($isSubmitted){
+                    if($userAnswer){
+                        $data['score'] += $score;
+                    }
+                }
+
+            }
+            $reportTemp[] = $data;
+        }
+
+
+        $reports = DB::select(DB::raw($sqlReportQuery));
+        $reportQuestions = DB::select(DB::raw($reportQuestionQuery));
+        $data = [
+            'summary' => $reportTemp,
+            'detail' => $temp,
+        ];
+        return Excel::download(new ReportCoreExport($data, $contest->title), "Training Report.xlsx");
+
+    }
+
 
 }

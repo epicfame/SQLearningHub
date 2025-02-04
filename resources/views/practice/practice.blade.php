@@ -109,7 +109,7 @@
         var myCodeMirror = CodeMirror(document.querySelector('#code'), {
             lineNumbers: true,
             tabSize: 2,
-            value: '{{ $answer }}',
+            value: '{!! $answer !!}',
             mode: 'text/x-mysql'
         });
 

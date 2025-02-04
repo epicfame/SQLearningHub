@@ -82,6 +82,7 @@ Route::prefix('/admin')->middleware(['auth'])->group(function () {
         Route::get('/data', [\App\Http\Controllers\AdminController::class, 'getContest']);
         Route::post('/add', [\App\Http\Controllers\AdminController::class, 'addContestData']);
         Route::get('/{id}/detail', [\App\Http\Controllers\AdminController::class, 'showContestDetail']);
+        Route::get('/download/{id}', [\App\Http\Controllers\AdminController::class, 'downloadExcel']);
         // Route::get('/report-contest', [\App\Http\Controllers\AdminController::class, 'reportContest']);
         // Route::get('/report-contest/data', [\App\Http\Controllers\AdminController::class, 'reportContestData']);
     });

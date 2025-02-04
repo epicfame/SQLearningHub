@@ -241,11 +241,20 @@
                         </div>
                         <div class="question-content-button">
                             @php
-                                $answered = $answers->get($question->id);
+                                // dd($question->id, $contest->id);
+                                // $answered = optional($answers->get($question->id))->get($contest->id);
+                                // $answered = optional(optional($answers->get($question->id)))->get($contest->id);
+                                // dd($answered)
+                                $questionAnswers = $answers->get($question->id);  // First get the answers by question ID
+                                $answered = false;
+                                if($questionAnswers->competition_batch_id == $contest->id && $questionAnswers->question_id == $question->id && $questionAnswers->is_true && $questionAnswers->user_id == Auth::user()->id ) {
+                                    $answered = true;
+                                }
+                                // $answered = $questionAnswers[$contest->id] ?? false;
                             @endphp
                             @if(!$isOngoing)
                                 <button type="button" class="btn btn-secondary" disabled>Has Ended</button>
-                            @elseif ($answered && $answered->is_true)
+                            @elseif ($answered)
                                 <button type="button" class="btn btn-light" onclick="goToQuestion({{ $question->id }})">Solved <i class="fa fa-check"></i></button>
                             @else
                                 <button type="button" class="btn btn-success" onclick="goToQuestion({{ $question->id }})">Solve Question</button>
